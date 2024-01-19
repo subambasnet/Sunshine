@@ -1,0 +1,206 @@
+---
+title: "Sunshine"
+author: "Subam"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This R Markdown document explores sunshine duration data from various countries and cities. The goal is to uncover insights and patterns related to sunshine patterns and their potential implications.
+
+## Data Exploration
+
+### Loading the Data
+```{r}
+library(tidyverse)
+sunshine_data <- read.csv("E:\\Portfolio_projects\\sunshine.csv")
+# Print the number of rows and columns
+dim(sunshine_data)
+```
+### Check for missing values and duplicated values
+```{r}
+# Checking for missing values
+sum(is.na(sunshine_data))  # Count total missing values
+colSums(is.na(sunshine_data))  # Count missing values per column
+# Checking for duplicates
+sum(duplicated(sunshine_data))  # Count duplicate rows
+```
+### Unique Countries and Cities
+```{r}
+# Find the number of unique countries
+n_countries <- length(unique(sunshine_data$Country))
+
+# Find the number of unique cities
+n_cities <- length(unique(sunshine_data$City))
+
+# Print the results
+cat("Number of unique countries:", n_countries, "\n")
+cat("Number of unique cities:", n_cities)
+```
+### Total Sunshine for a year in different Country or City
+```{r}
+# Find the minimum and maximum years
+min_year <- min(sunshine_data$Year)
+max_year <- max(sunshine_data$Year)
+
+# Print the range of years
+cat("Total sunshine for a year per country:", min_year, "-", max_year)
+```
+### Average Sunshine Duration per month
+```{r}
+# Calculate monthly averages across all countries/cities
+monthly_averages <- colMeans(sunshine_data[, 3:14])  # Exclude first two columns (Country and City)
+
+# Print the results
+month_names <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+cat("Average Sunshine Duration by Month:", "\n")
+sapply(month_names, FUN = function(month) paste0(month, ": ", round(monthly_averages[match(month, month_names)], 2), " hours"))
+```
+# sapply() loops through month names and prints the corresponding average sunshine duration rounded to two decimal places.
+
+###  Country/City with Highest Average Sunshine
+```{r}
+# Calculate mean sunshine duration for each country/city
+country_city_averages <- rowMeans(sunshine_data[, 3:14])
+
+# Find the maximum value and its corresponding row index
+max_index <- which.max(country_city_averages)
+
+# Extract the country and city from the row index
+max_country <- sunshine_data$Country[max_index]
+max_city <- sunshine_data$City[max_index]
+
+# Print the results
+cat("\nCountry/City with Highest Average Sunshine:", "\n")
+cat(paste0(max_country, ", ", max_city, ": ", round(country_city_averages[max_index], 2), " hours"))
+```
+### Which country has the most significant difference in sunshine duration between summer and winter?
+```{r}
+sunshine_data <- read.csv("E:\\Portfolio_projects\\sunshine.csv")
+# Define the months corresponding to summer and winter
+summer_months <- c("Jun", "Jul", "Aug")
+winter_months <- c("Dec", "Jan", "Feb")
+
+# Calculate the average sunshine duration for summer and winter
+sunshine_data <- sunshine_data %>%
+  group_by(Country) %>%
+  summarize(
+    SummerDuration = mean(c_across(all_of(summer_months)), na.rm = TRUE),
+    WinterDuration = mean(c_across(all_of(winter_months)), na.rm = TRUE),
+    Difference = SummerDuration - WinterDuration
+  ) %>%
+  arrange(desc(Difference))  # Arrange in descending order of difference
+
+# Display the top country with the most significant difference
+top_country <- sunshine_data[1, "Country"]
+print(paste("The country with the most significant difference is:", top_country))
+```
+### Months with Highest and Lowest Sunshine
+```{r}
+# Identify the month indices with maximum and minimum averages
+highest_month_index <- which.max(monthly_averages)
+lowest_month_index <- which.min(monthly_averages)
+
+# Extract the corresponding month names
+highest_month <- month_names[highest_month_index]
+lowest_month <- month_names[lowest_month_index]
+
+# Print the results
+cat("\nMonth with Highest Sunshine:", highest_month, "\n")
+cat("Month with Lowest Sunshine:", lowest_month)
+```
+
+### Which cities have the most consistent sunshine duration throughout the year (i.e., least variation between months)?
+```{r}
+sunshine_data <- read.csv("E:\\Portfolio_projects\\sunshine.csv")
+# Calculate the coefficient of variation (CV) for each city
+sunshine_variation <- sunshine_data %>%
+  group_by(Country, City) %>%
+  summarize(
+    CV = sd(c_across(starts_with("Jan", ignore.case = TRUE):starts_with("Dec", ignore.case = TRUE)), na.rm = TRUE) /
+         mean(c_across(starts_with("Jan", ignore.case = TRUE):starts_with("Dec", ignore.case = TRUE)), na.rm = TRUE)
+  ) %>%
+  arrange(CV)  # Arrange in ascending order of CV
+
+# Display cities with the least variation
+top_cities <- head(sunshine_variation, 5)  # Display the top 5 cities
+print(top_cities)
+```
+# These are the top 5 cities which experience the most sunshine in a given year.
+
+### Which cities have the most variable sunshine duration throughout the year (i.e., greatest variation between months)?
+```{r}
+# Calculate the coefficient of variation (CV) for each city
+sunshine_variation <- sunshine_data %>%
+  group_by(Country, City) %>%
+  summarize(
+    CV = sd(c_across(starts_with("Jan", ignore.case = TRUE):starts_with("Dec", ignore.case = TRUE)), na.rm = TRUE) /
+         mean(c_across(starts_with("Jan", ignore.case = TRUE):starts_with("Dec", ignore.case = TRUE)), na.rm = TRUE)
+  ) %>%
+  arrange(desc(CV))  # Arrange in descending order of CV
+
+# Display cities with the most variation
+top_cities <- head(sunshine_variation, 5)  # Display the top 5 cities
+print(top_cities)
+```
+# These are the top 5 cities that experience least amount of sunshine in a year.
+
+### Interactive Map
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(leaflet)
+
+# Reshape the data for plotting
+melted_data <- pivot_longer(sunshine_data, cols = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), names_to = "Month", values_to = "SunshineDuration")
+
+# Convert 'Month' column to a factor with proper ordering
+melted_data$Month <- factor(melted_data$Month, levels = month.name)
+
+# Read geolocation data from CSV file
+geolocation_data <- read.csv("E:\\Portfolio_projects\\latandlon.csv") 
+
+# Identify common columns for merging
+common_columns <- intersect(names(geolocation_data), names(melted_data))
+
+# Check if the common columns are present
+if (length(common_columns) == 0) {
+  stop("No common columns found for merging. Check column names in both datasets.")
+}
+
+# Merge datasets based on common columns
+merged_data <- merge(melted_data, geolocation_data, by = common_columns, all.x = TRUE)
+
+# Calculate average sunshine duration for each location
+avg_sunshine <- merged_data %>%
+  group_by(Country, City, Latitude, Longitude) %>%
+  summarise(AvgSunshineDuration = mean(SunshineDuration, na.rm = TRUE))
+
+# Filter out rows with missing or invalid lat/lon values
+avg_sunshine <- avg_sunshine[complete.cases(avg_sunshine$Latitude, avg_sunshine$Longitude), ]
+
+# Create an interactive map using leaflet without marker clustering
+interactive_map <- leaflet(avg_sunshine) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lat = ~Latitude,
+    lng = ~Longitude,
+    radius = ~AvgSunshineDuration/50,  # Adjust the radius based on your data
+    color = "orange",
+    stroke = FALSE,
+    fillOpacity = 0.7,
+    popup = ~paste(Country, City, "<br>", "Avg. Sunshine Duration:", round(AvgSunshineDuration, 2), "hours")
+  ) %>%
+  addLegend(
+    "bottomright",
+    colors = "orange",
+    labels = "Avg. Sunshine Duration",
+    opacity = 1
+  )
+
+# Display the interactive map
+interactive_map
+```
+
